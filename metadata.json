@@ -1,0 +1,6 @@
+{
+  "name": "Logos & Polis — Tutor de Filosofía Griega",
+  "description": "Tutor académico riguroso y biblioteca interactiva de mapas conceptuales sobre Filosofía Griega Arcaica y Clásica: del mito y la oralidad a la polis democrática y la sofística.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

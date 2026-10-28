@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: #12111a;
+    color: #f5f3ff;
+    scroll-behavior: smooth;
+    letter-spacing: 0.01em;
+  }
+
+  h1, h2, h3, .font-editorial {
+    font-family: var(--font-serif);
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Markmap Touch & Pastel Goth Visual Overrides */
+svg.crowley-mindmap {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  background-color: #12111a;
+  color: #f5f3ff;
+}
+
+svg.crowley-mindmap .markmap-node {
+  cursor: pointer;
+}
+
+/* Enlarge touch hitbox on Markmap node collapse circles (minimum 44px effective target via stroke-width) */
+svg.crowley-mindmap .markmap-node > circle {
+  r: 7px;
+  stroke-width: 18px;
+  stroke: rgba(192, 132, 252, 0.18);
+  cursor: pointer;
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+svg.crowley-mindmap .markmap-node:hover > circle {
+  stroke: rgba(244, 114, 182, 0.4);
+}
+
+svg.crowley-mindmap .markmap-foreign {
+  color: #f5f3ff;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+svg.crowley-mindmap .markmap-foreign div {
+  padding: 6px 8px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+svg.crowley-mindmap .markmap-foreign a {
+  color: #d8b4fe;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 600;
+  padding: 8px 4px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+svg.crowley-mindmap .markmap-foreign a:hover {
+  color: #f472b6;
+}
+
+svg.crowley-mindmap .markmap-foreign em {
+  color: #f472b6;
+  font-family: var(--font-serif);
+  font-size: 1.06em;
+}
+
+

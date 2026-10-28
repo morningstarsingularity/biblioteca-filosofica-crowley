@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#12111a"/>
+  <circle cx="256" cy="268" r="168" fill="#1c1a29" stroke="#c084fc" stroke-width="10"/>
+  <!-- Cat Ears Headband -->
+  <path d="M126 196 L150 96 L216 154 Z" fill="#1c1a29" stroke="#c084fc" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M144 176 L158 118 L198 152 Z" fill="#f472b6"/>
+  <path d="M386 196 L362 96 L296 154 Z" fill="#1c1a29" stroke="#c084fc" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M368 176 L354 118 L314 152 Z" fill="#f472b6"/>
+  <!-- Headphones Arc & Cups -->
+  <path d="M108 268 C108 156 404 156 404 268" stroke="#d8b4fe" stroke-width="16" stroke-linecap="round"/>
+  <rect x="82" y="236" width="44" height="86" rx="22" fill="#c084fc"/>
+  <rect x="386" y="236" width="44" height="86" rx="22" fill="#c084fc"/>
+  <!-- Greek Phi / Logos Symbol in center -->
+  <circle cx="256" cy="276" r="56" stroke="#f472b6" stroke-width="14"/>
+  <line x1="256" y1="192" x2="256" y2="360" stroke="#d8b4fe" stroke-width="14" stroke-linecap="round"/>
+</svg>
