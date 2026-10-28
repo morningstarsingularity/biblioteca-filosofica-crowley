@@ -1,89 +1,82 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { GoogleGenAI } from "@google/genai";
-import {
-  buildSystemInstruction,
-  detectContextFromQuery,
-  generateAcademicSynthesis,
-} from "../../src/utils/tutorEngine";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Solo permitir peticiones POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { message, activeThemeId = 1, history = [] } = req.body || {};
+  const { message, history = [] } = req.body || {};
 
   if (!message || typeof message !== "string" || !message.trim()) {
-    return res.status(400).json({ error: "Por favor ingresa una consulta filosófica válida." });
+    return res.status(400).json({ error: "Por favor ingresa una pregunta válida." });
   }
 
   const trimmedMessage = message.trim();
-  const detected = detectContextFromQuery(trimmedMessage, Number(activeThemeId) || 1);
-  const fallbackPayload = generateAcademicSynthesis(
-    trimmedMessage,
-    Number(activeThemeId) || 1
-  );
-
   const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-  const hasRealApiKey =
-    Boolean(apiKey) &&
-    apiKey !== "MY_GEMINI_API_KEY" &&
-    apiKey!.trim().length > 10;
 
-  if (!hasRealApiKey) {
-    return res.status(200).json(fallbackPayload);
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+    return res.status(500).json({
+      answer: "Error de configuración: no se detectó la GEMINI_API_KEY en las variables de entorno de Vercel.",
+    });
   }
 
   try {
-    const ai = new GoogleGenAI({
-      apiKey: apiKey!,
-    });
+    const ai = new GoogleGenAI({ apiKey });
 
+    // Historial de conversación
     const conversationContext = Array.isArray(history)
       ? history
-          .slice(-6)
+          .slice(-8)
           .map(
             (m: { role?: string; content?: string }) =>
-              `${m.role === "user" ? "Estudiante" : "Crowley (Tutora)"}: ${m.content || ""}`
+              `${m.role === "user" ? "Estudiante" : "Crowley"}: ${m.content || ""}`
           )
           .join("\n")
       : "";
 
+    const systemInstruction = `Eres Crowley, una tutora y guía filosófica brillante, reflexiva, perspicaz y con un toque sutil de ironía elegante. 
+Tu especialidad es la filosofía griega (la pólis, el mythos, el lógos, Vernant, Detienne, Castoriadis, Havelock, Platón, etc.), pero eres un chatbot completamente capaz de razonar, conversar y responder sobre CUALQUIER duda, tema o consulta general que te haga el estudiante con rigor, calidez y agudeza intelectual.
+Si la pregunta es general o cotidiana, responde con naturalidad manteniendo tu estilo distintivo.
+Si la pregunta es filosófica, utiliza términos clave cuando sea oportuno (en cursiva) y mantén un análisis conceptual crítico.
+Sé clara, directa y estructurada para que se lea cómodamente en cualquier pantalla.`;
+
     const prompt = [
-      conversationContext ? `Historial reciente:\n${conversationContext}\n` : "",
-      `Tema activo sugerido: ${detected.primaryTheme.fullTitle}`,
-      `Consulta del estudiante: ${trimmedMessage}`,
-      `Responde como Crowley (con tu tono reflexivo, perspicaz, sutilmente irónico y riguroso). Recuerda cumplir las 4 reglas: 1) Claro, conciso y legible en móvil; 2) Citar conceptos clave griegos en cursiva (${detected.matchedConcepts.map((c) => c.term).join(", ")}); 3) Indicar el Tema exacto, autor/año y su relación con la pólis y el lógos; 4) Mantener una postura filosófica crítica y contextual.`,
+      conversationContext ? `Historial reciente de la conversación:\n${conversationContext}\n` : "",
+      `Pregunta o mensaje del estudiante: ${trimmedMessage}`,
     ]
       .filter(Boolean)
       .join("\n");
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       contents: prompt,
       config: {
-        systemInstruction: buildSystemInstruction(),
-        temperature: 0.35,
+        systemInstruction,
+        temperature: 0.7,
       },
     });
 
     const text = response.text;
+
     if (text && text.trim()) {
       return res.status(200).json({
         tutorName: "Crowley",
         answer: text.trim(),
-        themeBadge: `${detected.primaryTheme.code} · ${detected.primaryTheme.shortTitle}`,
-        authorsCited: detected.matchedAuthors.map((a) => a.name),
-        conceptsUsed: detected.matchedConcepts.map((c) => c.term),
-        polisLogosSynthesis: detected.primaryTheme.polisLogosConnection,
-        followUpSuggestions: detected.primaryTheme.suggestedQuestions,
+        themeBadge: "Diálogo Abierto",
+        authorsCited: [],
+        conceptsUsed: [],
+        followUpSuggestions: [],
       });
     }
 
-    return res.status(200).json(fallbackPayload);
-  } catch (err) {
+    return res.status(500).json({
+      answer: "No pude formular una respuesta en este momento. Inténtalo de nuevo.",
+    });
+  } catch (err: any) {
     console.error("Error en Gemini API:", err);
-    return res.status(200).json(fallbackPayload);
+    return res.status(500).json({
+      answer: `Ocurrió un error al conectar con Gemini: ${err?.message || "Error desconocido"}`,
+    });
   }
 }
