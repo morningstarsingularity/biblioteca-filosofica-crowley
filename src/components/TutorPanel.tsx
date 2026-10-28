@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, RotateCcw, Sparkles } from "lucide-react";
+import { Send, BookOpen, Compass, RotateCcw, ArrowUpRight } from "lucide-react";
 import {
-  CROWLEY_NAME,
-  generateAcademicSynthesis,
-  TutorResponsePayload,
-} from "../utils/tutorEngine";
+  PHILOSOPHY_THEMES,
+  PhilosophyTheme,
+  GREEK_CONCEPTS,
+} from "../data/philosophyData";
+import { CROWLEY_NAME } from "../utils/tutorEngine";
 import { CrowleyAvatar } from "./CrowleyAvatar";
 
 export interface ChatMessage {
@@ -21,11 +22,11 @@ export interface ChatMessage {
 }
 
 interface TutorPanelProps {
-  activeThemeId?: number;
-  onSelectTheme?: (themeId: number) => void;
+  activeThemeId: number;
+  onSelectTheme: (themeId: number) => void;
   externalQuery: string | null;
   onClearExternalQuery: () => void;
-  onOpenThemeMap?: (themeId: number) => void;
+  onOpenThemeMap: (themeId: number) => void;
 }
 
 function renderFormattedLine(line: string, idx: number) {
@@ -78,28 +79,29 @@ function renderFormattedLine(line: string, idx: number) {
 }
 
 export const TutorPanel: React.FC<TutorPanelProps> = ({
-  activeThemeId = 1,
+  activeThemeId,
+  onSelectTheme,
   externalQuery,
   onClearExternalQuery,
+  onOpenThemeMap,
 }) => {
+  const activeTheme: PhilosophyTheme =
+    PHILOSOPHY_THEMES.find((t) => t.id === activeThemeId) ||
+    PHILOSOPHY_THEMES[0];
+
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: "welcome-msg",
       role: "tutor",
       content: [
-        "**Hola, soy Crowley, tu tutora filosófica.**",
-        "Estoy lista para analizar y debatir cualquier cuestión de nuestro programa: desde la transición del *mŷthos* al *lógos*, el estatuto de la verdad en Detienne, la oralidad y la paideía platónica en Havelock, hasta la autoinstitución de la pólis con Castoriadis o la logología sofística en Cassin.",
-        "Puedes preguntarme sobre cualquier autor, pasaje o concepto griego sin necesidad de restringirte a un tema fijo. ¿Por dónde empezamos hoy?",
+        "**Hola, soy Crowley, tu tutora y guía filosófica en esta Biblioteca Conceptual.**",
+        "Con mis audífonos puestos he estado escuchando el murmullo de los antiguos y los dilemas contemporáneos. Puedes elegir un tema de referencia o preguntarme directamente sobre cualquier duda, autor, concepto griego o cuestión que quieras analizar.",
       ].join("\n\n"),
       meta: {
-        themeBadge: "Diálogo Abierto · Filosofía Griega",
-        authorsCited: ["Vernant", "Detienne", "Havelock", "Castoriadis", "Cassin"],
-        conceptsUsed: ["mŷthos", "lógos", "alétheia", "isonomía"],
-        followUpSuggestions: [
-          "¿Cómo se relaciona la verdad mágica de Detienne con la verdad política del ágora?",
-          "Explícame la crítica de Havelock a la mímesis y la poesía homérica.",
-          "¿Qué significa la autoinstitución de la sociedad según Castoriadis?",
-        ],
+        themeBadge: "Crowley AI",
+        authorsCited: [],
+        conceptsUsed: [],
+        followUpSuggestions: activeTheme.suggestedQuestions,
       },
     },
   ]);
@@ -109,18 +111,10 @@ export const TutorPanel: React.FC<TutorPanelProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]);
-
   const submitQuery = async (rawQuery: string) => {
     const trimmed = rawQuery.trim();
     if (!trimmed) {
-      setValidationError("Escribe una consulta o concepto antes de enviar.");
+      setValidationError("Escribe una consulta antes de enviar.");
       return;
     }
 
@@ -141,7 +135,6 @@ export const TutorPanel: React.FC<TutorPanelProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: trimmed,
-          activeThemeId,
           history: messages.slice(-8).map((m) => ({
             role: m.role,
             content: m.content,
@@ -149,37 +142,25 @@ export const TutorPanel: React.FC<TutorPanelProps> = ({
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Error en el servidor: ${response.status}`);
-      }
+      const data = await response.json();
 
-      const data: TutorResponsePayload = await response.json();
       const tutorMsg: ChatMessage = {
         id: `tutor-${Date.now()}`,
         role: "tutor",
-        content: data.answer,
+        content: data.answer || "No recibí respuesta.",
         meta: {
-          themeBadge: data.themeBadge,
+          themeBadge: data.themeBadge || `Tema ${activeThemeId}`,
           authorsCited: data.authorsCited || [],
           conceptsUsed: data.conceptsUsed || [],
-          polisLogosSynthesis: data.polisLogosSynthesis || "",
           followUpSuggestions: data.followUpSuggestions || [],
         },
       };
       setMessages((prev) => [...prev, tutorMsg]);
-    } catch (_err) {
-      const fallback = generateAcademicSynthesis(trimmed, activeThemeId);
+    } catch (err: any) {
       const tutorMsg: ChatMessage = {
         id: `tutor-${Date.now()}`,
         role: "tutor",
-        content: fallback.answer,
-        meta: {
-          themeBadge: fallback.themeBadge,
-          authorsCited: fallback.authorsCited,
-          conceptsUsed: fallback.conceptsUsed,
-          polisLogosSynthesis: fallback.polisLogosSynthesis,
-          followUpSuggestions: fallback.followUpSuggestions,
-        },
+        content: `No pude conectar con el servidor: ${err.message}. Comprueba tu conexión.`,
       };
       setMessages((prev) => [...prev, tutorMsg]);
     } finally {
@@ -204,168 +185,236 @@ export const TutorPanel: React.FC<TutorPanelProps> = ({
     setMessages((prev) => [prev[0]]);
   };
 
+  const themeConcepts = GREEK_CONCEPTS.filter(
+    (c) => c.themeId === activeThemeId
+  );
+
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col bg-[#1c1a29]/80 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-      {/* Barra superior de Crowley */}
-      <div className="px-5 py-4 bg-[#242038]/90 border-b border-white/10 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <CrowleyAvatar size="md" />
-          <div>
-            <div className="text-xs uppercase tracking-widest text-[#d8b4fe] font-semibold flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#f472b6]" />
-              {CROWLEY_NAME} · Tutora con IA
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* Columna Principal: Chat */}
+      <div className="lg:col-span-7 flex flex-col bg-[#1c1a29]/75 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+        {/* Encabezado */}
+        <div className="px-5 py-4 bg-[#242038]/85 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5">
+            <CrowleyAvatar size="md" />
+            <div>
+              <div className="text-xs uppercase tracking-widest text-[#d8b4fe]">
+                Tutora Oficial · {CROWLEY_NAME}
+              </div>
+              <h2 className="text-xl font-serif font-semibold text-[#f5f3ff] mt-0.5">
+                {CROWLEY_NAME} — Diálogo Crítico: Pólis, Mythos y Lógos
+              </h2>
             </div>
-            <h2 className="text-lg sm:text-xl font-serif font-semibold text-[#f5f3ff] mt-0.5">
-              Diálogo Abierto: Pólis, Mythos y Lógos
-            </h2>
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={handleResetConversation}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#e2dff0] bg-[#12111a]/70 border border-white/15 rounded-lg hover:border-[#c084fc] hover:text-[#d8b4fe] transition-colors whitespace-nowrap"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          Nueva charla
-        </button>
-      </div>
-
-      {/* Flujo de mensajes del chat */}
-      <div
-        className="p-4 sm:p-6 space-y-6 max-h-[620px] overflow-y-auto"
-        aria-live="polite"
-      >
-        {messages.map((msg) => {
-          if (msg.role === "user") {
-            return (
-              <div key={msg.id} className="flex justify-end">
-                <div className="max-w-[85%] sm:max-w-[75%] bg-[#2d2546] border border-[#c084fc]/40 text-[#f5f3ff] px-4 py-3 rounded-2xl shadow">
-                  <div className="text-[11px] uppercase tracking-wider text-[#d8b4fe] mb-1 font-medium">
-                    Tú
-                  </div>
-                  <p className="text-sm leading-relaxed">{msg.content}</p>
-                </div>
-              </div>
-            );
-          }
-
-          const paragraphs = msg.content
-            .split("\n")
-            .filter((l) => l.trim().length > 0);
-
-          return (
-            <article
-              key={msg.id}
-              className="bg-[#161422]/90 border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-sm"
-            >
-              {/* Encabezado del mensaje */}
-              <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-                <CrowleyAvatar size="sm" />
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#a59fc2]">
-                  <span className="font-semibold text-[#f472b6]">
-                    {CROWLEY_NAME}
-                  </span>
-                  {msg.meta?.themeBadge && (
-                    <>
-                      <span aria-hidden="true">·</span>
-                      <span className="font-semibold text-[#c084fc]">
-                        {msg.meta.themeBadge}
-                      </span>
-                    </>
-                  )}
-                  {msg.meta?.authorsCited && msg.meta.authorsCited.length > 0 && (
-                    <>
-                      <span aria-hidden="true">·</span>
-                      <span>Autores: {msg.meta.authorsCited.join(", ")}</span>
-                    </>
-                  )}
-                  {msg.meta?.conceptsUsed && msg.meta.conceptsUsed.length > 0 && (
-                    <>
-                      <span aria-hidden="true">·</span>
-                      <span className="font-serif italic text-[#d8b4fe]">
-                        Conceptos: {msg.meta.conceptsUsed.join(", ")}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Texto de la respuesta */}
-              <div className="space-y-2.5 text-[15px] leading-relaxed text-[#ece9f8]">
-                {paragraphs.map((line, idx) => (
-                  <p key={idx} className="leading-relaxed">
-                    {renderFormattedLine(line, idx)}
-                  </p>
-                ))}
-              </div>
-
-              {/* Sugerencias de seguimiento */}
-              {msg.meta?.followUpSuggestions &&
-                msg.meta.followUpSuggestions.length > 0 && (
-                  <div className="pt-3 border-t border-white/10">
-                    <div className="text-xs font-medium text-[#a59fc2] mb-2">
-                      Preguntas sugeridas:
-                    </div>
-                    <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                      {msg.meta.followUpSuggestions.map((q, qIdx) => (
-                        <button
-                          key={qIdx}
-                          type="button"
-                          onClick={() => submitQuery(q)}
-                          className="text-left text-xs text-[#e2dff0] bg-[#231f36] hover:bg-[#2e2947] border border-white/10 hover:border-[#c084fc]/50 px-3.5 py-2 rounded-lg transition-colors leading-snug"
-                        >
-                          {q}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-            </article>
-          );
-        })}
-
-        {isLoading && (
-          <div className="bg-[#161422]/90 border border-[#c084fc]/30 rounded-2xl p-4 flex items-center gap-3 text-sm text-[#d8b4fe]">
-            <CrowleyAvatar size="sm" />
-            <span>{CROWLEY_NAME} está formulando su respuesta crítica...</span>
-          </div>
-        )}
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* Formulario de entrada */}
-      <form
-        onSubmit={handleFormSubmit}
-        className="p-4 bg-[#242038]/90 border-t border-white/10"
-        noValidate
-      >
-        {validationError && (
-          <p role="alert" className="text-xs font-medium text-[#f472b6] mb-2">
-            {validationError}
-          </p>
-        )}
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <input
-            id="tutor-question-input"
-            type="text"
-            value={inputValue}
-            onChange={(e) => {
-              setInputValue(e.target.value);
-              if (validationError) setValidationError(null);
-            }}
-            placeholder="Hazle cualquier consulta filosófica a Crowley..."
-            className="flex-1 bg-[#12111a] border border-white/15 rounded-xl px-4 py-3 min-h-[44px] text-sm text-[#f5f3ff] placeholder:text-[#7c7599] focus:outline-none focus:border-[#c084fc]"
-          />
           <button
-            type="submit"
-            disabled={isLoading}
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 min-h-[44px] text-sm font-semibold text-[#12111a] bg-[#f472b6] hover:bg-[#f9a8d4] disabled:opacity-50 rounded-xl transition-colors whitespace-nowrap"
+            type="button"
+            onClick={handleResetConversation}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] text-xs font-medium text-[#e2dff0] bg-[#12111a]/70 border border-white/15 rounded-lg hover:border-[#c084fc] hover:text-[#d8b4fe] transition-colors whitespace-nowrap shrink-0"
           >
-            <Send className="w-4 h-4" />
-            Enviar
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reiniciar charla
           </button>
         </div>
-      </form>
+
+        {/* Selector de canal temático */}
+        <div className="px-5 py-3.5 bg-[#161422]/90 border-b border-white/10">
+          <div className="text-xs text-[#a59fc2] mb-2">
+            Sintonizar canal de referencia:
+          </div>
+          <div
+            role="tablist"
+            className="flex items-center gap-2 overflow-x-auto pb-1"
+          >
+            {PHILOSOPHY_THEMES.map((theme) => {
+              const isSelected = theme.id === activeThemeId;
+              return (
+                <button
+                  key={theme.id}
+                  type="button"
+                  onClick={() => onSelectTheme(theme.id)}
+                  className={`px-3.5 py-2.5 min-h-[44px] text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 ${
+                    isSelected
+                      ? "bg-[#c084fc] text-[#12111a] font-semibold"
+                      : "bg-[#231f36] text-[#d8b4fe] hover:bg-[#2d2846] border border-white/10"
+                  }`}
+                >
+                  Tema {theme.id}: {theme.shortTitle}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Lista de mensajes */}
+        <div
+          className="p-5 space-y-6 max-h-[580px] overflow-y-auto"
+          aria-live="polite"
+        >
+          {messages.map((msg) => {
+            if (msg.role === "user") {
+              return (
+                <div key={msg.id} className="flex justify-end">
+                  <div className="max-w-[88%] sm:max-w-[80%] bg-[#2d2546] border border-[#c084fc]/40 text-[#f5f3ff] px-4 py-3.5 rounded-2xl">
+                    <div className="text-[11px] uppercase tracking-wider text-[#d8b4fe] mb-1">
+                      Tú
+                    </div>
+                    <p className="text-sm leading-relaxed">{msg.content}</p>
+                  </div>
+                </div>
+              );
+            }
+
+            const paragraphs = msg.content
+              .split("\n")
+              .filter((l) => l.trim().length > 0);
+
+            return (
+              <article
+                key={msg.id}
+                className="bg-[#161422]/90 border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3.5"
+              >
+                <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+                  <CrowleyAvatar size="sm" />
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#a59fc2]">
+                    <span className="font-semibold text-[#f472b6]">
+                      {CROWLEY_NAME}
+                    </span>
+                    {msg.meta?.themeBadge && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-semibold text-[#c084fc]">
+                          {msg.meta.themeBadge}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2.5 text-[15px] leading-relaxed text-[#ece9f8] max-w-prose">
+                  {paragraphs.map((line, idx) => (
+                    <p key={idx} className="leading-relaxed">
+                      {renderFormattedLine(line, idx)}
+                    </p>
+                  ))}
+                </div>
+              </article>
+            );
+          })}
+
+          {isLoading && (
+            <div className="bg-[#161422]/90 border border-[#c084fc]/30 rounded-2xl p-4 flex items-center gap-3 text-sm text-[#d8b4fe]">
+              <CrowleyAvatar size="sm" />
+              <span>{CROWLEY_NAME} está pensando...</span>
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Formulario */}
+        <form
+          onSubmit={handleFormSubmit}
+          className="p-4 bg-[#242038]/85 border-t border-white/10"
+        >
+          {validationError && (
+            <p className="text-xs font-medium text-[#f472b6] mb-2">
+              {validationError}
+            </p>
+          )}
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                if (validationError) setValidationError(null);
+              }}
+              placeholder="Hazle cualquier consulta o pregunta a Crowley..."
+              className="flex-1 bg-[#12111a] border border-white/15 rounded-xl px-4 py-3 min-h-[44px] text-sm text-[#f5f3ff] placeholder:text-[#7c7599] focus:outline-none focus:border-[#c084fc]"
+            />
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 min-h-[44px] text-sm font-semibold text-[#12111a] bg-[#f472b6] hover:bg-[#f9a8d4] disabled:opacity-50 rounded-xl transition-colors whitespace-nowrap shrink-0"
+            >
+              <Send className="w-4 h-4" />
+              Enviar
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Columna Derecha: Contexto y conceptos sugeridos */}
+      <aside className="lg:col-span-5 space-y-6">
+        <div className="bg-[#1c1a29]/75 backdrop-blur-md border border-white/10 rounded-2xl p-5 sm:p-6 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <div className="text-xs uppercase tracking-widest text-[#c084fc] font-semibold">
+              {activeTheme.code} · Guía Activa
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenThemeMap(activeTheme.id)}
+              className="inline-flex items-center gap-1 px-2 py-1.5 min-h-[44px] text-xs font-medium text-[#f472b6] hover:text-[#d8b4fe] underline underline-offset-4 whitespace-nowrap shrink-0"
+            >
+              Abrir mapa interactivo
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div>
+            <h3 className="text-2xl font-serif font-semibold text-[#f5f3ff]">
+              {activeTheme.fullTitle}
+            </h3>
+            <p className="text-sm text-[#c4bddb] mt-1 leading-relaxed">
+              {activeTheme.subtitle}
+            </p>
+            <div className="text-xs text-[#a59fc2] mt-2">
+              Autores base: {activeTheme.authors.join(" · ")}
+            </div>
+          </div>
+
+          <div className="bg-[#12111a]/80 border border-[#c084fc]/25 rounded-xl p-4 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#f472b6]">
+              <Compass className="w-3.5 h-3.5 text-[#f472b6]" />
+              Eje Temático
+            </div>
+            <p className="text-xs sm:text-sm text-[#e2dff0] leading-relaxed">
+              {activeTheme.polisLogosConnection}
+            </p>
+          </div>
+
+          <div className="space-y-2.5">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[#a59fc2]">
+              Conceptos de apoyo (haz clic para consultar)
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {themeConcepts.map((concept) => (
+                <button
+                  key={concept.id}
+                  type="button"
+                  onClick={() =>
+                    submitQuery(
+                      `Crowley, háblame sobre ${concept.term} (${concept.greek}) en el contexto de ${concept.author}.`
+                    )
+                  }
+                  className="text-left p-3.5 min-h-[48px] rounded-xl bg-[#161422]/90 hover:bg-[#252038] border border-white/10 hover:border-[#c084fc]/50 transition-colors group"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-serif italic font-semibold text-base text-[#d8b4fe] group-hover:text-[#f472b6]">
+                      {concept.term}
+                    </span>
+                    <span className="text-xs text-[#a59fc2] font-serif">
+                      {concept.greek}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#c4bddb] mt-1 line-clamp-2">
+                    {concept.translation}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 };
