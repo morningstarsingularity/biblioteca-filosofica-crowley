@@ -1,4 +1,4 @@
- import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { GoogleGenAI } from "@google/genai";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -16,15 +16,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
     return res.status(500).json({
-      answer: "Error: No se detectó la GEMINI_API_KEY en las variables de entorno de Vercel.",
+      answer: "Error: No se detectó la clave GEMINI_API_KEY en Vercel.",
     });
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey });
 
-    // Mantener solo los últimos 3 mensajes para acelerar el procesamiento de contexto
-    const recentHistory = Array.isArray(history) ? history.slice(-3) : [];
+    // Historial compacto para máxima velocidad de respuesta
+    const recentHistory = Array.isArray(history) ? history.slice(-4) : [];
     const contextPrompt = recentHistory
       .map(
         (m: { role?: string; content?: string }) =>
@@ -32,11 +32,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       )
       .join("\n");
 
-    const systemInstruction = `Eres Crowley, una tutora y guía filosófica ágil, perspicaz y elocuente.
-Responde de inmediato, con soltura y precisión.
-Si te hacen un saludo o pregunta cotidiana (ej. "¿hola?", "¿qué día es hoy?"), responde de forma breve, natural y directa con tu estilo característico (máximo 1 o 2 oraciones).
-Si te hacen preguntas conceptuales o académicas, explica con claridad y rigor usando cursivas para conceptos clave.
-Sé concisa: nunca des respuestas innecesariamente largas ni hagas esperar al usuario.`;
+    const systemInstruction = `Eres Crowley, una tutora y compañera de estudio virtual.
+Tu personalidad es cálida, amable, entusiasta, paciente y muy accesible. Trata al usuario con empatía y cercanía, sin sonar nunca cortante, condescendiente, fría ni distante.
+- Saludos y preguntas cotidianas (ej. "¿hola?", "¿cómo estás?", "¿qué día es hoy?"): Responde con simpatía, alegría y cordialidad en una o dos frases breves, poniéndote a su disposición.
+- Dudas de estudio o filosofía: Explica con claridad pedagógica, de forma alentadora y comprensible, usando términos conceptuales en cursiva cuando sea oportuno.
+- Respuestas ágiles: Ve directo al grano con un tono agradable, evitando rodeos innecesarios.`;
 
     const fullPrompt = contextPrompt
       ? `${contextPrompt}\nEstudiante: ${message.trim()}\nCrowley:`
@@ -47,8 +47,11 @@ Sé concisa: nunca des respuestas innecesariamente largas ni hagas esperar al us
       contents: fullPrompt,
       config: {
         systemInstruction,
-        temperature: 0.7,
-        maxOutputTokens: 350,
+        temperature: 0.6,
+        maxOutputTokens: 300,
+        thinkingConfig: {
+          thinkingBudget: 0, // Desactiva el sobreanálisis para responder de inmediato
+        },
       },
     });
 
@@ -56,8 +59,8 @@ Sé concisa: nunca des respuestas innecesariamente largas ni hagas esperar al us
 
     return res.status(200).json({
       tutorName: "Crowley",
-      answer: text ? text.trim() : "Dime, ¿en qué puedo ayudarte?",
-      themeBadge: "Crowley AI",
+      answer: text ? text.trim() : "¡Hola! ¿En qué te puedo apoyar hoy?",
+      themeBadge: "Crowley",
       authorsCited: [],
       conceptsUsed: [],
       followUpSuggestions: [],
@@ -65,7 +68,7 @@ Sé concisa: nunca des respuestas innecesariamente largas ni hagas esperar al us
   } catch (err: any) {
     console.error("Error en Gemini API:", err);
     return res.status(500).json({
-      answer: `Error al conectar con Crowley: ${err?.message || "Tiempo de espera agotado."}`,
+      answer: `Ocurrió un pequeño inconveniente al conectar: ${err?.message || "inténtalo de nuevo en unos segundos."}`,
     });
   }
 }
