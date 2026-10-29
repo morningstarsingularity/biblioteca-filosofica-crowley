@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { GoogleGenAI } from "@google/genai";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -20,70 +21,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Historial compacto (últimos 3 mensajes)
-    const recentHistory = Array.isArray(history) ? history.slice(-3) : [];
-    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+    const ai = new GoogleGenAI({ apiKey });
 
-    for (const m of recentHistory) {
-      contents.push({
-        role: m.role === "user" ? "user" : "model",
-        parts: [{ text: String(m.content || "") }],
-      });
-    }
-
-    contents.push({
-      role: "user",
-      parts: [{ text: message.trim() }],
-    });
+    // Historial compacto (últimos 4 mensajes) para reducir la carga de tokens
+    const recentHistory = Array.isArray(history) ? history.slice(-4) : [];
+    const contextPrompt = recentHistory
+      .map(
+        (m: { role?: string; content?: string }) =>
+          `${m.role === "user" ? "Estudiante" : "Crowley"}: ${m.content || ""}`
+      )
+      .join("\n");
 
     const systemInstruction = 
-      "Eres Crowley, una tutora y compañera de estudio virtual. Tu trato es cálido, entusiasta, paciente y muy accesible. " +
-      "Responde siempre con amabilidad y cercanía. " +
-      "Para saludos o preguntas cotidianas, responde con calidez en 1 o 2 oraciones breves. " +
-      "Para temas de filosofía o estudio, explica de forma didáctica y clara. Sé directa y ágil.";
+      "Eres Crowley, una tutora y compañera de estudio virtual. Tu trato es siempre amable, cálido, comprensivo y paciente. " +
+      "Responde con cercanía, empatía y naturalidad. " +
+      "Si el usuario te saluda o hace una pregunta cotidiana (por ejemplo 'hola' o '¿qué día es hoy?'), salúdalo cordialmente en 1 o 2 frases breves y ponte a su disposición con entusiasmo. " +
+      "Si te pregunta sobre filosofía o conceptos del temario, explica con claridad y rigor formativo, destacando términos clave en cursiva. " +
+      "Mantén las explicaciones concisas y bien estructuradas.";
 
-    // Petición REST directa a la API de Google Gemini (sin latencia de wrappers)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+    const contents = contextPrompt
+      ? `${contextPrompt}\nEstudiante: ${message.trim()}\nCrowley:`
+      : message.trim();
 
-    const apiResponse = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents,
-        systemInstruction: {
-          parts: [{ text: systemInstruction }],
-        },
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 350,
-        },
-      }),
+    const response = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents,
+      config: {
+        systemInstruction,
+        temperature: 0.7,
+        maxOutputTokens: 350,
+      },
     });
 
-    if (!apiResponse.ok) {
-      const errBody = await apiResponse.text();
-      console.error("Gemini API Error:", errBody);
-      return res.status(500).json({
-        answer: `Error de la API (${apiResponse.status}): ${errBody}`,
-      });
-    }
-
-    const data = await apiResponse.json();
-    const candidateText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = response.text;
 
     return res.status(200).json({
       tutorName: "Crowley",
-      answer: candidateText ? candidateText.trim() : "¡Hola! ¿En qué te puedo apoyar?",
+      answer: text ? text.trim() : "¡Hola! ¿En qué te puedo orientar hoy?",
       themeBadge: "Crowley",
       authorsCited: [],
       conceptsUsed: [],
       followUpSuggestions: [],
     });
   } catch (err: any) {
-    console.error("Error en función de chat:", err);
+    console.error("Error en Gemini API:", err);
     return res.status(500).json({
-      answer: `Error de conexión: ${err?.message || "Inténtalo de nuevo."}`,
+      answer: `Error del servidor: ${err?.message || "No se pudo procesar la solicitud."}`,
     });
   }
 }
