@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { GoogleGenAI } from "@google/genai";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -16,39 +16,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
     return res.status(500).json({
-      answer: "Error: No se detectó la API Key de Gemini en Vercel.",
+      answer: "Error: No se detectó la GEMINI_API_KEY en las variables de entorno de Vercel.",
     });
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey });
 
-    // Tomamos solo los últimos 4 mensajes para procesar menos tokens y acelerar la respuesta
-    const conversationContext = Array.isArray(history)
-      ? history
-          .slice(-4)
-          .map(
-            (m: { role?: string; content?: string }) =>
-              `${m.role === "user" ? "Estudiante" : "Crowley"}: ${m.content || ""}`
-          )
-          .join("\n")
-      : "";
+    // Mantener solo los últimos 3 mensajes para acelerar el procesamiento de contexto
+    const recentHistory = Array.isArray(history) ? history.slice(-3) : [];
+    const contextPrompt = recentHistory
+      .map(
+        (m: { role?: string; content?: string }) =>
+          `${m.role === "user" ? "Estudiante" : "Crowley"}: ${m.content || ""}`
+      )
+      .join("\n");
 
-    const systemInstruction = `Eres Crowley, una tutora filosófica ágil, perspicaz y elocuente. 
-Responde con fluidez, rapidez y concisión a cualquier duda del estudiante (máximo 2 a 3 párrafos precisos).
-Usa conceptos griegos en cursiva si enriquecen la respuesta, pero sé directa y dinámica sin rodeos innecesarios.`;
+    const systemInstruction = `Eres Crowley, una tutora y guía filosófica ágil, perspicaz y elocuente.
+Responde de inmediato, con soltura y precisión.
+Si te hacen un saludo o pregunta cotidiana (ej. "¿hola?", "¿qué día es hoy?"), responde de forma breve, natural y directa con tu estilo característico (máximo 1 o 2 oraciones).
+Si te hacen preguntas conceptuales o académicas, explica con claridad y rigor usando cursivas para conceptos clave.
+Sé concisa: nunca des respuestas innecesariamente largas ni hagas esperar al usuario.`;
 
-    const prompt = conversationContext
-      ? `Historial:\n${conversationContext}\n\nPregunta: ${message.trim()}`
+    const fullPrompt = contextPrompt
+      ? `${contextPrompt}\nEstudiante: ${message.trim()}\nCrowley:`
       : message.trim();
 
     const response = await ai.models.generateContent({
       model: "gemini-3.8-flash",
-      contents: prompt,
+      contents: fullPrompt,
       config: {
         systemInstruction,
         temperature: 0.7,
-        maxOutputTokens: 600, // Limita la longitud máxima para una entrega de respuesta inmediata
+        maxOutputTokens: 350,
       },
     });
 
@@ -56,15 +56,16 @@ Usa conceptos griegos en cursiva si enriquecen la respuesta, pero sé directa y 
 
     return res.status(200).json({
       tutorName: "Crowley",
-      answer: text ? text.trim() : "No pude formular una respuesta.",
+      answer: text ? text.trim() : "Dime, ¿en qué puedo ayudarte?",
       themeBadge: "Crowley AI",
       authorsCited: [],
       conceptsUsed: [],
       followUpSuggestions: [],
     });
   } catch (err: any) {
+    console.error("Error en Gemini API:", err);
     return res.status(500).json({
-      answer: `Error al conectar con Gemini: ${err?.message || "Error desconocido"}`,
+      answer: `Error al conectar con Crowley: ${err?.message || "Tiempo de espera agotado."}`,
     });
   }
 }
