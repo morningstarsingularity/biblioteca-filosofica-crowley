@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   COURSE_METADATA,
-  PHILOSOPHY_THEMES,
 } from "./data/philosophyData";
 import { CROWLEY_NAME } from "./utils/tutorEngine";
 import { TutorPanel } from "./components/TutorPanel";
@@ -117,7 +116,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Mobile Navigation Strip (visible only on small screens, >=44px touch targets) */}
+      {/* Mobile Navigation Strip */}
       <nav
         aria-label="Navegación móvil"
         className="md:hidden grid grid-cols-4 gap-1.5 px-3 py-2 bg-[#1a1726]/95 border-b border-white/10"
@@ -200,32 +199,6 @@ export default function App() {
 
             <div className="flex items-center gap-3 self-start lg:self-center shrink-0">
               <PWAInstallButton />
-            </div>
-          </div>
-
-          {/* 5-Theme Quick Jump Bar (min-h-[44px] touch hitboxes) */}
-          <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="text-xs text-[#a59fc2] font-medium uppercase tracking-wider shrink-0">
-              Ruta curricular de los 5 temas:
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {PHILOSOPHY_THEMES.map((theme) => {
-                const isCurrent = theme.id === activeThemeId;
-                return (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    onClick={() => setActiveThemeId(theme.id)}
-                    className={`px-3.5 py-2 min-h-[44px] text-xs font-medium rounded-xl border transition-colors whitespace-nowrap shrink-0 tabular-nums ${
-                      isCurrent
-                        ? "bg-[#f472b6] text-[#12111a] border-[#f472b6] font-semibold"
-                        : "bg-[#12111a]/80 text-[#d8b4fe] border-white/15 hover:border-[#c084fc] hover:text-white"
-                    }`}
-                  >
-                    0{theme.id}. {theme.shortTitle}
-                  </button>
-                );
-              })}
             </div>
           </div>
         </div>
